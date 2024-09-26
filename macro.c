@@ -3,6 +3,7 @@
 #include <malloc.h>
 #include <stdio.h>
 #include <time.h>
+#include <unistd.h>
 #include <windows.h>
 
 #include "macro.h"
@@ -22,8 +23,7 @@ void main() {
 
     // List to store all points
 
-    node_t *list = init_node();
-    printf("%d", sizeof(*list));
+    node_t *my_node = init_node();
 
     // Create a clock 
 
@@ -32,19 +32,59 @@ void main() {
 
     char a = 0;
     while (1) {
-        if (kbhit()) {
-            char key = getch();
+        bool l = 0;
+        bool r = 0;
 
-            if (key == 'a') {
-                break;
-            }
+        // Handle Clicks
+        if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) { // most significant
+            l = 1;
         }
+        if (GetAsyncKeyState(VK_RBUTTON) & 0x8000) { // least
+            r = 1;
+        }
+
+        // printf("%d %d", lclick, rclick);
+
+        // Handle kb-hits
+        
+        char keys[MAX_KB_HITS];
+        short num_keys = 0;
+        while (kbhit()) {
+            if (num_keys < MAX_KB_HITS) { // read them all anyways
+                keys[num_keys] = getch();
+                printf("%c", keys[num_keys]);
+                
+                ++num_keys;
+            }
+            else {
+                getch();
+            }
+            printf("%d", count);
+        }
+
         POINT pos = {0};
         GetCursorPos(&pos);
-        add_element(list, pos);
 
-        printf("Points: %d %d", pos.x, pos.y);
+        insert_frame(my_node, l, r, keys, num_keys, pos);
+
+        if (count == 10000) {
+            break;
+        }
         count++;
+        printf("\n");
+    }
+
+    // Why not printing
+
+    frame_t iterator = my_node->frames[0];
+    printf("EFJALSDFJAKLSDJLASKDJFASJDF");
+    for (int i = 0; i < 10000; i++) {
+        printf("%d %d %d ", iterator.lclick, iterator.rclick, iterator.num_hits);
+        for (int j = 0; j < iterator.num_hits; j++) {
+            printf("%c ", iterator.kb_hits[j]);
+        }
+        printf("%d %d \n", iterator.point.x, iterator.point.y);
+        iterator = my_node->frames[i];
     }
 
     clock_t after = clock();
@@ -53,49 +93,34 @@ void main() {
 
     printf("Points: %d\n", count);
     printf("%ld\n", total);
-
-    POINT *iterator = list->points;
-    for (int x = 0; x < list->size; x++) {
-        printf("Point %d   :   %d %d  \n", x, iterator->x, iterator->y);
-        SetCursorPos(iterator->x, iterator->y);
-        iterator++;
-    }
-}
+} /* main() */
 
 node_t *init_node() {
-    POINT *new_points = malloc(sizeof(POINT) * INIT_CAPACITY);
     node_t *new_node = malloc(sizeof(node_t));
+    assert(new_node);
 
-    assert(new_points);
-    assert(new_node);    
+    new_node->frames = malloc(sizeof(node_t) * INIT_CAPACITY);
+    assert(new_node->frames);
 
     new_node->size = 0;
     new_node->capacity = INIT_CAPACITY;
-    new_node->points = new_points;
-
+    
     return new_node;
 } /* init_node() */
 
-int add_element(node_t *node, POINT element) {
-    assert(node);
-
-    if (node->size == node->capacity) {
-        increase_size(node);
+void insert_frame(node_t *node, bool l, bool r, char *keys, short num_keys, 
+                  POINT pos) {
+    frame_t new_frame = {0};
+    new_frame.lclick = l;
+    new_frame.rclick = r;
+    new_frame.num_hits = num_keys;
+    
+    for (int i = 0; i < num_keys; i++) {
+        new_frame.kb_hits[i] = keys[i];
     }
 
-    node->points[node->size] = element;
-    node->size += 1;
+    new_frame.point = pos;
 
-} /* add_element() */
-
-void increase_size(node_t *node) {
-    assert(node);
-        
-    assert((__INT_MAX__ - node->capacity) > INCREMENT_CAPACITY); // Prevent overflow
-
-    node->points = realloc(node->points, (INCREMENT_CAPACITY + node->capacity) * sizeof(POINT));
-    node->capacity = INCREMENT_CAPACITY + node->capacity; 
-    printf("\n\nSIZE: %d %d", node->size, node->capacity);
-    assert(node->points);
-
-} /* increase_size() */
+    node->frames[node->size] = new_frame;
+    ++(node->size);
+}
